@@ -1,4 +1,5 @@
-ls $HOME
-cd src
-error_command
 ls
+cd home
+cd user
+ls
+cd fake_folder

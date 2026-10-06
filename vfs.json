@@ -1,1 +1,27 @@
-{}
+{
+  "type": "dir",
+  "contents": {
+    "home": {
+      "type": "dir",
+      "contents": {
+        "user": {
+          "type": "dir",
+          "contents": {
+            "hello.txt": {
+              "type": "file",
+              "data": "0J/RgNC40LLQtdGC"
+            },
+            "docs": {
+              "type": "dir",
+              "contents": {}
+            }
+          }
+        }
+      }
+    },
+    "etc": {
+      "type": "dir",
+      "contents": {}
+    }
+  }
+}
