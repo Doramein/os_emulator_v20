@@ -3,19 +3,18 @@ import os
 import socket
 import argparse
 import json
+import base64
 
 parser = argparse.ArgumentParser(description="Эмулятор ОС")
 parser.add_argument('--vfs', type=str, help='Путь к VFS (JSON)')
 parser.add_argument('--script', type=str, help='Путь к стартовому скрипту')
 args = parser.parse_args()
 
-# --- Глобальные переменные для VFS (Этап 3) ---
-vfs_tree = {} # Вся файловая система в памяти
-current_path = [] # Текущий путь (пустой список = корень)
+vfs_tree = {} 
+current_path = [] 
 
 def load_vfs():
     global vfs_tree
-    # Загружаем JSON строго в оперативную память
     if args.vfs and os.path.exists(args.vfs):
         with open(args.vfs, 'r', encoding='utf-8') as f:
             vfs_tree = json.load(f)
@@ -23,13 +22,11 @@ def load_vfs():
         vfs_tree = {"type": "dir", "contents": {}}
 
 def get_current_node():
-    # Ищем текущую папку в словаре по пути
     node = vfs_tree
     for folder in current_path:
         node = node["contents"].get(folder, {})
     return node
 
-# --- Логика Эмулятора ---
 def get_window_title():
     username = os.getlogin()
     hostname = socket.gethostname()
@@ -41,7 +38,6 @@ def execute_single_command(cmd_line):
         return True 
 
     text_area.insert(tk.END, f"> {cmd_line}\n")
-
     tokens = cmd_line.split()
     parsed_tokens = []
     
@@ -55,6 +51,7 @@ def execute_single_command(cmd_line):
     command = parsed_tokens[0]
     cmd_args = parsed_tokens[1:]
 
+    # --- Обработка команд ---
     if command == "exit":
         root.destroy()
         return True
@@ -62,8 +59,11 @@ def execute_single_command(cmd_line):
     elif command == "ls":
         node = get_current_node()
         if node.get("type") == "dir" and "contents" in node:
-            # Получаем имена файлов и папок внутри текущей папки
-            items = list(node["contents"].keys())
+            items = []
+            for name, info in node["contents"].items():
+                perms = info.get("perms", "")
+                perm_str = f"[{perms}] " if perms else ""
+                items.append(f"{perm_str}{name}")
             output = "  ".join(items) if items else "(пусто)"
             text_area.insert(tk.END, f"{output}\n")
         else:
@@ -78,11 +78,10 @@ def execute_single_command(cmd_line):
         
         if target == "..":
             if current_path:
-                current_path.pop() # Возвращаемся на уровень назад
+                current_path.pop() 
         elif target == "/":
-            current_path = [] # Идем в самый корень
+            current_path = [] 
         else:
-            # Проверяем, есть ли такая папка
             if "contents" in node and target in node["contents"]:
                 if node["contents"][target].get("type") == "dir":
                     current_path.append(target)
@@ -94,6 +93,54 @@ def execute_single_command(cmd_line):
                 return False
         return True
         
+    # --- Новые команды Этапа 4 ---
+    elif command == "whoami":
+        text_area.insert(tk.END, f"{os.getlogin()}\n")
+        return True
+        
+    elif command == "tail":
+        if not cmd_args:
+            text_area.insert(tk.END, "tail: пропущен операнд\n")
+            return False
+        filename = cmd_args[0]
+        node = get_current_node()
+        
+        if "contents" in node and filename in node["contents"]:
+            file_info = node["contents"][filename]
+            if file_info.get("type") == "file":
+                try:
+                    data = base64.b64decode(file_info.get("data", "")).decode('utf-8')
+                    lines = data.split('\n')
+                    tail_lines = lines[-10:]
+                    text_area.insert(tk.END, "\n".join(tail_lines) + "\n")
+                    return True
+                except Exception as e:
+                    text_area.insert(tk.END, f"tail: ошибка чтения файла: {e}\n")
+                    return False
+            else:
+                text_area.insert(tk.END, f"tail: {filename}: Это каталог\n")
+                return False
+        else:
+            text_area.insert(tk.END, f"tail: {filename}: Нет такого файла\n")
+            return False
+            
+    # --- Новая команда Этапа 5 ---
+    elif command == "chmod":
+        if len(cmd_args) < 2:
+            text_area.insert(tk.END, "chmod: пропущен операнд\n")
+            return False
+        mode = cmd_args[0]
+        filename = cmd_args[1]
+        node = get_current_node()
+        
+        if "contents" in node and filename in node["contents"]:
+            node["contents"][filename]["perms"] = mode
+            text_area.insert(tk.END, f"Права доступа для '{filename}' изменены на {mode}\n")
+            return True
+        else:
+            text_area.insert(tk.END, f"chmod: {filename}: Нет такого файла или каталога\n")
+            return False
+            
     else:
         text_area.insert(tk.END, f"Ошибка: неизвестная команда '{command}'\n")
         return False
@@ -102,15 +149,12 @@ def process_manual_input(event):
     cmd_line = entry_field.get().strip()
     entry_field.delete(0, tk.END)
     execute_single_command(cmd_line)
-    
-    # Показываем текущий путь перед вводом
     path_str = "/" + "/".join(current_path)
     text_area.insert(tk.END, f"[{path_str}] $ ")
     text_area.see(tk.END)
 
 def run_startup_script():
-    load_vfs() # Загружаем файловую систему до выполнения скрипта
-    
+    load_vfs() 
     if not args.script or not os.path.exists(args.script):
         text_area.insert(tk.END, f"[/] $ ")
         return
@@ -129,8 +173,6 @@ def run_startup_script():
                 break
                 
         text_area.insert(tk.END, "--- Скрипт завершен ---\n\n")
-        
-        # Печатаем строку ввода после скрипта
         path_str = "/" + "/".join(current_path)
         text_area.insert(tk.END, f"[{path_str}] $ ")
         text_area.see(tk.END)
