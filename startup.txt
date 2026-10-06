@@ -1,0 +1,4 @@
+ls $HOME
+cd src
+error_command
+ls
