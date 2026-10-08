@@ -1,0 +1,6 @@
+whoami
+cd home
+cd user
+tail hello.txt
+ls
+cd fake_folder

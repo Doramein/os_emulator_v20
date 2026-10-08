@@ -1,0 +1,4 @@
+cd home
+cd user
+ls
+cd fake_folder

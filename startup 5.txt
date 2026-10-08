@@ -1,0 +1,7 @@
+whoami
+cd home
+cd user
+tail hello.txt
+chmod 777 hello.txt
+ls
+cd fake_folder
